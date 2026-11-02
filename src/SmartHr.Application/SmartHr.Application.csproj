@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../SmartHr.Domain/SmartHr.Domain.csproj" />
+  </ItemGroup>
+</Project>
