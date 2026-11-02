@@ -3,3 +3,27 @@
 .vs/
 .env
 *.user
+
+# secrets
+.env
+.env.*
+*.pfx
+*.pem
+*.key
+appsettings.*.local.json
+secrets.json
+# python / node
+venv/
+.venv/
+__pycache__/
+node_modules/
+frontend/.angular/
+dist/
+# models / vector stores
+*.gguf
+*.safetensors
+*.onnx
+models/
+.ollama/
+chroma*/
+faiss*/
