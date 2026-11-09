@@ -28,3 +28,6 @@ models/
 chroma*/
 faiss*/
 !.env.example
+
+# local LinkedIn drafts
+linkedin/
