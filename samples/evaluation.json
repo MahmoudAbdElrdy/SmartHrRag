@@ -1,1 +1,80 @@
-{"topK":3,"cases":[{"question":"How many annual leave days for 3 years of experience?","expectedChunkId":"REPLACE_WITH_CHUNK_GUID_FROM_GET_DOCUMENT"}]}
+{
+  "topK": 3,
+  "cases": [
+    {
+      "question": "How many annual leave days for 3 years of experience?",
+      "expectedDocument": "Annual Leave Policy | سياسة الإجازة السنوية",
+      "expectedSection": "Entitlement"
+    },
+    {
+      "question": "كم يوم إجازة سنوية لموظف لديه 3 سنوات خبرة؟",
+      "expectedDocument": "Annual Leave Policy | سياسة الإجازة السنوية",
+      "expectedSection": "الاستحقاق"
+    },
+    {
+      "question": "How many unused leave days can I carry over?",
+      "expectedDocument": "Annual Leave Policy | سياسة الإجازة السنوية",
+      "expectedSection": "Carry Over"
+    },
+    {
+      "question": "When do I need a medical certificate for sick leave?",
+      "expectedDocument": "Sick Leave Policy | سياسة الإجازة المرضية",
+      "expectedSection": "Medical Certificate"
+    },
+    {
+      "question": "كم يوم إجازة مرضية براتب كامل؟",
+      "expectedDocument": "Sick Leave Policy | سياسة الإجازة المرضية",
+      "expectedSection": "أيام الإجازة المرضية"
+    },
+    {
+      "question": "What are the working hours during Ramadan?",
+      "expectedDocument": "Working Hours Policy | سياسة ساعات العمل",
+      "expectedSection": "Ramadan"
+    },
+    {
+      "question": "ما هي الساعات الأساسية للعمل؟",
+      "expectedDocument": "Working Hours Policy | سياسة ساعات العمل",
+      "expectedSection": "ساعات العمل الرسمية"
+    },
+    {
+      "question": "What is the overtime rate on public holidays?",
+      "expectedDocument": "Overtime Policy | سياسة العمل الإضافي",
+      "expectedSection": "Overtime Rates"
+    },
+    {
+      "question": "ما الحد الأقصى للعمل الإضافي في الشهر؟",
+      "expectedDocument": "Overtime Policy | سياسة العمل الإضافي",
+      "expectedSection": "الحدود القصوى"
+    },
+    {
+      "question": "How many days per week can I work from home?",
+      "expectedDocument": "Remote Work Policy | سياسة العمل عن بعد",
+      "expectedSection": "Remote Days"
+    },
+    {
+      "question": "هل يوجد بدل إنترنت للعمل عن بعد؟",
+      "expectedDocument": "Remote Work Policy | سياسة العمل عن بعد",
+      "expectedSection": "الأجهزة والأمان"
+    },
+    {
+      "question": "When are salaries paid?",
+      "expectedDocument": "Payroll Policy | سياسة الرواتب",
+      "expectedSection": "Pay Date"
+    },
+    {
+      "question": "كم نسبة بدل السكن؟",
+      "expectedDocument": "Payroll Policy | سياسة الرواتب",
+      "expectedSection": "البدلات"
+    },
+    {
+      "question": "Can I accept a gift from a supplier?",
+      "expectedDocument": "Code of Conduct | مدونة السلوك",
+      "expectedSection": "Conflicts of Interest"
+    },
+    {
+      "question": "كيف أبلغ عن مخالفة؟",
+      "expectedDocument": "Code of Conduct | مدونة السلوك",
+      "expectedSection": "الإبلاغ عن المخالفات"
+    }
+  ]
+}

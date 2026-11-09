@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <UserSecretsId>smarthrrag-api-6f1c2b7e</UserSecretsId>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../SmartHr.Infrastructure/SmartHr.Infrastructure.csproj" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />

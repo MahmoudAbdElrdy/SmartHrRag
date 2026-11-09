@@ -1,0 +1,13 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+COPY Directory.Build.props SmartHrRag.sln ./
+COPY src/ src/
+RUN dotnet publish src/SmartHr.Api/SmartHr.Api.csproj -c Release -o /app
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+WORKDIR /app
+COPY --from=build /app .
+COPY samples/ /app/samples/
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "SmartHr.Api.dll"]

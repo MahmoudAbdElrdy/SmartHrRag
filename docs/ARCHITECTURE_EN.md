@@ -19,7 +19,7 @@ The API and Infrastructure depend inward on Application and Domain. Application 
 3. The chunker splits at paragraphs and uses Markdown headings as section names.
 4. Nearby paragraphs are grouped up to a default limit of about 1,100 characters. Oversized Markdown tables repeat their header when possible.
 5. The policy name and section are added to each chunk before embedding, so each vector keeps useful context.
-6. OllamaClient sends each chunk to nomic-embed-text through /api/embed.
+6. OllamaClient sends each chunk to bge-m3 through /api/embed.
 7. SQL Server stores the document, its chunks, and each vector as JSON.
 
 ## What is chunking?
@@ -37,7 +37,7 @@ Use the same embedding model for indexing and retrieval. If the model changes, r
 ## What happens when a question is asked?
 
 1. Angular sends the question and topK to POST /api/ask.
-2. nomic-embed-text converts the question to a vector.
+2. bge-m3 converts the question to a vector.
 3. The application reads chunk vectors from SQL Server and computes cosine similarity against the question vector.
 4. It selects the top matching chunks. This step is called retrieval.
 5. It packages those passages with policy names, sections, and chunk IDs.

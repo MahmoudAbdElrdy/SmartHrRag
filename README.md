@@ -15,7 +15,7 @@ From PowerShell in this folder:
 
 ~~~powershell
 docker compose up -d
-docker compose exec ollama ollama pull nomic-embed-text
+docker compose exec ollama ollama pull bge-m3
 docker compose exec ollama ollama pull llama3.2:3b
 dotnet restore src/SmartHr.Api/SmartHr.Api.csproj
 dotnet ef database update --project src/SmartHr.Infrastructure --startup-project src/SmartHr.Api

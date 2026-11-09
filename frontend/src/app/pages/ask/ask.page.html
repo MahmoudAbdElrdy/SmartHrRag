@@ -1,0 +1,203 @@
+<div class="page-shell" [attr.lang]="language()" [attr.dir]="language() === 'ar' ? 'rtl' : 'ltr'">
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Smart HR">
+      <span class="brand-mark">HR</span>
+      <span>Smart<span class="brand-light">HR</span></span>
+    </a>
+
+    <div class="topbar-actions">
+      <button class="language-toggle" type="button" (click)="toggleLanguage()">
+        {{ ui().languageButton }}
+      </button>
+      <div
+        class="service-state"
+        [class.is-online]="apiStatus() === 'online'"
+        [class.is-offline]="apiStatus() === 'offline'"
+      >
+        <span class="state-dot"></span>
+        @if (apiStatus() === 'online') {
+          <span>{{ ui().serviceOnline }}</span>
+        } @else if (apiStatus() === 'checking') {
+          <span>{{ ui().serviceChecking }}</span>
+        } @else {
+          <span>{{ ui().serviceOffline }}</span>
+        }
+      </div>
+    </div>
+  </header>
+
+  <main class="content">
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">{{ ui().eyebrow }}</p>
+        <h1>
+          {{ ui().title }} <span>{{ ui().titleHighlight }}</span>
+        </h1>
+        <p class="hero-description">{{ ui().intro }}</p>
+      </div>
+      <div class="model-chip">
+        <span class="model-icon">✳</span>
+        <span
+          ><strong>Ollama</strong><small>{{ ui().localModels }}</small></span
+        >
+      </div>
+    </section>
+
+    @if (notice(); as message) {
+      <div
+        class="notice"
+        [class.notice-error]="message.kind === 'error'"
+        [class.notice-success]="message.kind === 'success'"
+        role="status"
+      >
+        <span>{{ message.kind === 'success' ? '✓' : '!' }}</span>
+        <p>{{ message.message }}</p>
+      </div>
+    }
+
+    <section class="work-grid">
+
+      <article class="card ask-card" id="ask">
+        <div class="card-heading">
+          <div class="step-number step-violet">02</div>
+          <div>
+            <p class="eyebrow">{{ ui().semanticSearch }}</p>
+            <h2>{{ ui().askPolicy }}</h2>
+          </div>
+        </div>
+        <p class="card-description">{{ ui().askDescription }}</p>
+
+        <form (ngSubmit)="askPolicy()">
+          <label for="question">{{ ui().yourQuestion }}</label>
+          <textarea id="question" name="question" [(ngModel)]="question" rows="3"></textarea>
+          <div class="ask-controls">
+            <label for="top-k">{{ ui().resultCount }}</label>
+            <select id="top-k" name="topK" [(ngModel)]="topK">
+              <option [ngValue]="1">1</option>
+              <option [ngValue]="3">3</option>
+              <option [ngValue]="5">5</option>
+            </select>
+            <span class="control-spacer"></span>
+            <button
+              class="button button-secondary"
+              type="button"
+              (click)="searchPolicies()"
+              [disabled]="busyAction() !== null"
+            >
+              @if (busyAction() === 'search') {
+                <span class="spinner"></span> {{ ui().searching }}
+              } @else {
+                {{ ui().searchOnly }}
+              }
+            </button>
+            <button class="button button-primary" type="submit" [disabled]="busyAction() !== null">
+              @if (busyAction() === 'ask') {
+                <span class="spinner"></span> {{ ui().asking }}
+              } @else {
+                {{ ui().askAssistant }} <span aria-hidden="true">←</span>
+              }
+            </button>
+          </div>
+        </form>
+
+        @if (answer(); as result) {
+          <section class="answer-panel" aria-live="polite">
+            <div class="answer-title">
+              <span class="spark">✳</span>
+              <h3>{{ ui().answer }}</h3>
+            </div>
+            <p class="answer-text">{{ result.answer }}</p>
+            <div class="sources-heading">{{ ui().sources }}</div>
+            <div class="source-list">
+              @for (source of result.sources; track source.chunkId) {
+                <article class="source-item">
+                  <div class="source-meta">
+                    <strong>{{ source.documentName }}</strong>
+                    <span>{{ source.section }}</span>
+                    <span class="score">{{ formatScore(source.score) }}</span>
+                  </div>
+                  <p>{{ source.text }}</p>
+                </article>
+              }
+            </div>
+            @if (result.questionId) {
+              <div class="feedback-row">
+                @if (feedbackSent()) {
+                  <span>{{ ui().thanks }}</span>
+                } @else {
+                  <span>{{ ui().helpful }}</span>
+                  <button class="button button-secondary" type="button" (click)="sendFeedback(true)">👍</button>
+                  <button class="button button-secondary" type="button" (click)="sendFeedback(false)">👎</button>
+                }
+              </div>
+            }
+          </section>
+        }
+
+        @if (searchHits().length > 0) {
+          <section class="answer-panel" aria-live="polite">
+            <div class="answer-title">
+              <span class="spark">⌕</span>
+              <h3>{{ ui().closestChunks }}</h3>
+            </div>
+            <div class="source-list">
+              @for (hit of searchHits(); track hit.chunkId) {
+                <article class="source-item">
+                  <div class="source-meta">
+                    <strong>{{ hit.documentName }}</strong>
+                    <span>{{ hit.section }}</span>
+                    <span class="score">{{ formatScore(hit.score) }}</span>
+                  </div>
+                  <p>{{ hit.text }}</p>
+                </article>
+              }
+            </div>
+          </section>
+        }
+      </article>
+    </section>
+
+    <section class="how-it-works" id="how-it-works">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">{{ ui().walkthrough }}</p>
+          <h2>{{ ui().behindScenes }}</h2>
+        </div>
+        <a [href]="guideUrl()" class="text-link"> {{ ui().detailedGuide }} <span>↗</span> </a>
+      </div>
+
+      <div class="flow-grid">
+        <article class="flow-step">
+          <span class="flow-index">1</span>
+          <h3>Chunking</h3>
+          <p>{{ ui().chunking }}</p>
+        </article>
+        <article class="flow-step">
+          <span class="flow-index">2</span>
+          <h3>Embedding</h3>
+          <p>{{ ui().embedding }}</p>
+        </article>
+        <article class="flow-step">
+          <span class="flow-index">3</span>
+          <h3>Retrieval</h3>
+          <p>{{ ui().retrieval }}</p>
+        </article>
+        <article class="flow-step">
+          <span class="flow-index">4</span>
+          <h3>{{ ui().answer }}</h3>
+          <p>{{ ui().answerStep }}</p>
+        </article>
+      </div>
+
+      <div class="note-row">
+        <span>i</span>
+        <p>{{ ui().storageNote }}</p>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>Smart HR Policy Assistant</span>
+      <span>{{ ui().footer }}</span>
+    </footer>
+  </main>
+</div>

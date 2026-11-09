@@ -1,4 +1,5 @@
 using SmartHr.Application;
+using SmartHr.Domain;
 
 namespace SmartHr.Api;
 
@@ -8,80 +9,58 @@ public static class PolicyEndpoints
     {
         var group = endpoints.MapGroup("/api/policies").WithTags("Policies");
 
-        group.MapPost(
-            "/text",
-            async (
-                TextUploadRequest request,
-                RagService rag,
-                CancellationToken cancellationToken
-            ) =>
-            {
-                if (
-                    string.IsNullOrWhiteSpace(request.Name)
-                    || string.IsNullOrWhiteSpace(request.Text)
-                )
-                {
-                    return Results.BadRequest(new { message = "Name and text are required." });
-                }
-
-                var documentId = await rag.IngestAsync(
-                    request.Name,
-                    "inline",
-                    request.Text,
-                    cancellationToken
-                );
-
-                return Results.Ok(new { documentId });
-            }
+        group.MapGet(
+            "/",
+            async (IPolicyRepository repository, CancellationToken ct) =>
+                Results.Ok(await repository.ListDocumentsAsync(ct))
         );
 
         group
             .MapPost(
+                "/text",
+                async (TextUploadRequest request, RagService rag, CancellationToken ct) =>
+                {
+                    if (string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.Text))
+                    {
+                        throw new ArgumentException("Name and text are required.");
+                    }
+
+                    return Results.Ok(await rag.IngestAsync(request.Name, "inline", request.Text, ct));
+                }
+            );
+
+        group
+            .MapPost(
                 "/upload",
-                async (
-                    IFormFile? file,
-                    RagService rag,
-                    ITextExtractor extractor,
-                    CancellationToken cancellationToken
-                ) =>
+                async (IFormFile? file, RagService rag, ITextExtractor extractor, CancellationToken ct) =>
                 {
                     if (file is null || file.Length is 0 or > 10_000_000)
                     {
-                        return Results.BadRequest(
-                            new { message = "File size must be 1 byte to 10 MB." }
-                        );
+                        throw new ArgumentException("File size must be 1 byte to 10 MB.");
                     }
 
                     string text;
                     await using (var stream = file.OpenReadStream())
                     {
-                        try
-                        {
-                            text = extractor.Extract(file.FileName, stream);
-                        }
-                        catch (NotSupportedException exception)
-                        {
-                            return Results.BadRequest(new { message = exception.Message });
-                        }
+                        text = extractor.Extract(file.FileName, stream);
                     }
 
-                    var documentId = await rag.IngestAsync(
+                    var result = await rag.IngestAsync(
                         Path.GetFileNameWithoutExtension(file.FileName),
                         file.FileName,
                         text,
-                        cancellationToken
+                        ct
                     );
-
-                    return Results.Ok(new { documentId });
+                    return Results.Ok(result);
                 }
             )
             .DisableAntiforgery();
 
         group.MapGet(
             "/{id:guid}",
-            async (Guid id, IPolicyRepository repository, CancellationToken cancellationToken) =>
+            async (Guid id, IPolicyRepository repository, CancellationToken ct) =>
             {
-                var document = await repository.GetDocumentAsync(id, cancellationToken);
+                var document = await repository.GetDocumentAsync(id, ct);
                 if (document is null)
                 {
                     return Results.NotFound();
@@ -93,19 +72,22 @@ public static class PolicyEndpoints
                         document.Id,
                         document.Name,
                         document.SourceFile,
+                        document.Status,
+                        document.CreatedUtc,
                         Chunks = document
                             .Chunks.OrderBy(chunk => chunk.Sequence)
-                            .Select(chunk => new
-                            {
-                                chunk.Id,
-                                chunk.Sequence,
-                                chunk.Section,
-                                chunk.Content,
-                            }),
+                            .Select(chunk => new { chunk.Id, chunk.Sequence, chunk.Section, chunk.Content }),
                     }
                 );
             }
         );
+
+        group
+            .MapDelete(
+                "/{id:guid}",
+                async (Guid id, RagService rag, CancellationToken ct) =>
+                    await rag.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound()
+            );
 
         return endpoints;
     }

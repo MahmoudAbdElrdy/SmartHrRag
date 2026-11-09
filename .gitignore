@@ -27,3 +27,4 @@ models/
 .ollama/
 chroma*/
 faiss*/
+!.env.example

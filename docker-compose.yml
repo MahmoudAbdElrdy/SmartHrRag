@@ -1,9 +1,10 @@
+# Secrets come from a local, git-ignored .env file (see .env.example).
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
       ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:-Your_strong_password_123!}"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env}"
     ports:
       - "14333:1433"
     volumes:
@@ -14,6 +15,22 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+  api:
+    profiles: ["api"]
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    depends_on:
+      - sqlserver
+      - ollama
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ConnectionStrings__SqlServer: "Server=sqlserver,1433;Database=SmartHrRag;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True"
+      Ollama__BaseUrl: "http://ollama:11434"
+      Jwt__Key: "${JWT_KEY:?Set JWT_KEY in .env}"
+      Admin__Password: "${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}"
+    ports:
+      - "5080:8080"
 volumes:
   sql_data:
   ollama_data:

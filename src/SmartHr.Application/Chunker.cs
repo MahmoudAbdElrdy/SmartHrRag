@@ -6,8 +6,13 @@ namespace SmartHr.Application;
 public sealed partial class StructureChunker
 {
     private const int DefaultMaxCharacters = 1_100;
+    public const int DefaultOverlapCharacters = 150;
 
-    public IReadOnlyList<TextChunk> Split(string text, int maxCharacters = DefaultMaxCharacters)
+    public IReadOnlyList<TextChunk> Split(
+        string text,
+        int maxCharacters = DefaultMaxCharacters,
+        int overlapCharacters = DefaultOverlapCharacters
+    )
     {
         ArgumentNullException.ThrowIfNull(text);
 
@@ -74,7 +79,41 @@ public sealed partial class StructureChunker
         }
 
         Flush();
-        return chunks;
+        return AddOverlap(chunks, overlapCharacters);
+    }
+
+    /// <summary>Prefixes each chunk with the tail of the previous chunk in the same section.</summary>
+    private static List<TextChunk> AddOverlap(List<TextChunk> chunks, int overlapCharacters)
+    {
+        if (overlapCharacters <= 0 || chunks.Count < 2)
+        {
+            return chunks;
+        }
+
+        var result = new List<TextChunk>(chunks.Count) { chunks[0] };
+        for (var i = 1; i < chunks.Count; i++)
+        {
+            var previous = chunks[i - 1];
+            var current = chunks[i];
+            if (previous.Section != current.Section || previous.Text.Contains('|'))
+            {
+                result.Add(current);
+                continue;
+            }
+
+            var tail = previous.Text.Length <= overlapCharacters
+                ? previous.Text
+                : previous.Text[^overlapCharacters..];
+            var space = tail.IndexOf(' ');
+            if (previous.Text.Length > overlapCharacters && space >= 0 && space < tail.Length - 1)
+            {
+                tail = tail[(space + 1)..];
+            }
+
+            result.Add(current with { Text = "…" + tail.Trim() + "\n\n" + current.Text });
+        }
+
+        return result;
     }
 
     private static IEnumerable<string> SplitLargeBlock(string block, int maxCharacters)
