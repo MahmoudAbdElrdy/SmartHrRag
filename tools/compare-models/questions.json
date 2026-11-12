@@ -1,0 +1,10 @@
+[
+  {"id":"Q1","q":"كم يوم إجازة سنوية يستحق موظف عنده 3 سنوات خبرة؟","expected":"21 يوم (من سنة إلى 5 سنوات) — annual-leave.md"},
+  {"id":"Q2","q":"إيه نسبة أجر العمل الإضافي في عطلة نهاية الأسبوع؟","expected":"150% من أجر الساعة (الأيام العادية 125%) — overtime.md"},
+  {"id":"Q3","q":"لو أخدت إجازة مرضية 20 يوم في السنة، هتتحسب إزاي من ناحية الراتب؟","expected":"أول 15 يوم براتب كامل، والـ5 أيام الباقية بنسبة 75% — sick-leave.md"},
+  {"id":"Q4","q":"إمتى بيتصرف المرتب، ولو اليوم ده جه عطلة يحصل إيه؟","expected":"يوم 27 من كل شهر بالتحويل البنكي؛ لو عطلة يُصرف في يوم العمل السابق — payroll.md"},
+  {"id":"Q5","q":"كام يوم في الأسبوع أقدر أشتغل من البيت، وإيه شرط الأهلية؟","expected":"حتى يومين في الأسبوع؛ بعد إنهاء فترة التجربة 3 شهور وطبيعة العمل تسمح وبموافقة المدير — remote-work.md"},
+  {"id":"Q6","q":"What is the maximum value of a gift I can accept from a supplier?","expected":"Gifts worth more than 100 SAR must not be accepted — code-of-conduct.md"},
+  {"id":"Q7","q":"How many hours per day do employees work during Ramadan?","expected":"6 hours per day — working-hours.md"},
+  {"id":"Q8","q":"كام يوم إجازة وضع (أمومة) بتاخدها الموظفة؟","expected":"غير موجود في المستندات — المفروض الموديل يقول إن المعلومة مش متاحة"}
+]

@@ -17,6 +17,7 @@ venv/
 .venv/
 __pycache__/
 node_modules/
+tools/compare-models/out/
 frontend/.angular/
 dist/
 # models / vector stores

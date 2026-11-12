@@ -1,0 +1,8 @@
+{
+  "name": "compare-models",
+  "private": true,
+  "description": "Shoots the Ask page once per evaluation question for the chat model currently running.",
+  "dependencies": {
+    "puppeteer-core": "^23.11.1"
+  }
+}

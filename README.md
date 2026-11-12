@@ -57,6 +57,7 @@ Open http://localhost:4200. The Angular development server proxies /api and
 - Frontend: Angular single-page app for policy ingestion and Q&A.
 
 See docs/ARCHITECTURE_AR.md for the Arabic architecture and RAG explanation.
+The same-retrieval chat-model comparison is in docs/llama-vs-qwen.md.
 
 ## Prototype limitations
 
