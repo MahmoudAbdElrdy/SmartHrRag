@@ -5,6 +5,7 @@ import {
   AskResponse,
   DocumentDetail,
   DocumentSummary,
+  EvaluationComparison,
   EvaluationResult,
   EvaluationRunSummary,
   HealthResponse,
@@ -61,6 +62,10 @@ export class RagApiService {
 
   runEvaluation(topK: number): Observable<EvaluationResult & { runId: string }> {
     return this.http.post<EvaluationResult & { runId: string }>('/api/evaluate', { topK });
+  }
+
+  compareEvaluation(topK: number): Observable<EvaluationComparison> {
+    return this.http.post<EvaluationComparison>('/api/evaluate/compare', { topK });
   }
 
   evaluationRuns(): Observable<EvaluationRunSummary[]> {

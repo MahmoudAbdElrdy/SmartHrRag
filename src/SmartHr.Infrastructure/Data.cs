@@ -45,6 +45,7 @@ public sealed class RagDbContext(DbContextOptions<RagDbContext> options) : DbCon
             e.Property(x => x.Question).HasMaxLength(1000);
             e.Property(x => x.ExpectedDocument).HasMaxLength(300);
             e.Property(x => x.ExpectedSection).HasMaxLength(500);
+            e.Property(x => x.Unanswerable).HasDefaultValue(false);
         });
 
         m.Entity<Employee>(e =>
@@ -87,7 +88,11 @@ public sealed class RagDbContext(DbContextOptions<RagDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        m.Entity<EvaluationRun>().HasKey(x => x.Id);
+        m.Entity<EvaluationRun>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Mode).HasMaxLength(32);
+        });
     }
 }
 

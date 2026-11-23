@@ -47,6 +47,9 @@ public sealed class RetrievalCase
     public string ExpectedDocument { get; set; } = "";
     public string? ExpectedSection { get; set; }
     public Guid? ExpectedChunkId { get; set; }
+
+    /// <summary>True when the policies do not contain an answer. Excluded from Recall and MRR.</summary>
+    public bool Unanswerable { get; set; }
 }
 
 public sealed class Employee
@@ -105,4 +108,7 @@ public sealed class EvaluationRun
     public double PrecisionAtK { get; set; }
     public double Mrr { get; set; }
     public string DetailsJson { get; set; } = "[]";
+
+    /// <summary>Vector, Keyword, Hybrid, or HybridRerank. Empty on runs created before modes existed.</summary>
+    public string? Mode { get; set; }
 }

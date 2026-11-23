@@ -31,6 +31,17 @@ services:
       Admin__Password: "${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}"
     ports:
       - "5080:8080"
+  # Optional cross-encoder. Off unless Retrieval:Reranker is enabled in appsettings.
+  # First start downloads BAAI/bge-reranker-v2-m3 into the volume.
+  reranker:
+    profiles: ["reranker"]
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
+    command: ["--model-id", "BAAI/bge-reranker-v2-m3"]
+    ports:
+      - "8081:80"
+    volumes:
+      - reranker_data:/data
 volumes:
   sql_data:
   ollama_data:
+  reranker_data:

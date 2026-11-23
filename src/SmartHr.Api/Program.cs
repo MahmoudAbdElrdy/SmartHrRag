@@ -28,6 +28,21 @@ builder.Services.AddDbContext<RagDbContext>(options =>
 );
 
 // RAG
+var retrieval =
+    builder.Configuration.GetSection(RetrievalOptions.SectionName).Get<RetrievalOptions>()
+    ?? new RetrievalOptions();
+builder.Services.AddSingleton(retrieval);
+builder.Services.AddHttpClient<ICrossEncoder, TeiRerankClient>((sp, client) =>
+{
+    var reranker = sp.GetRequiredService<RetrievalOptions>().Reranker;
+    if (Uri.TryCreate(reranker?.BaseUrl, UriKind.Absolute, out var baseUrl))
+    {
+        client.BaseAddress = baseUrl;
+    }
+
+    client.Timeout = Timeout.InfiniteTimeSpan;
+});
+
 builder.Services.AddScoped<IPolicyRepository, PolicyRepository>();
 builder.Services.AddScoped<RagService>();
 builder.Services.AddSingleton<VectorCache>();

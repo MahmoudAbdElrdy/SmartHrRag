@@ -115,6 +115,19 @@ public class IngestionTests
     }
 
     [Fact]
+    public async Task Keyword_miss_says_nothing_matched_when_policies_exist()
+    {
+        var (rag, _, _, _) = Create();
+        var empty = await rag.AskAsync("annual leave", 1, default, RetrievalMode.Keyword);
+        Assert.Equal(PromptBuilder.NoPoliciesMessage, empty.Answer);
+
+        await rag.IngestAsync("Leave", "l.md", "## Annual\n\nannual leave days", default);
+        var miss = await rag.AskAsync("zzzzqqqq", 3, default, RetrievalMode.Keyword);
+        Assert.Empty(miss.Sources);
+        Assert.Equal(PromptBuilder.NoMatchMessage, miss.Answer);
+    }
+
+    [Fact]
     public async Task Ask_returns_sources_and_uses_prompt()
     {
         var (rag, _, _, chat) = Create();
@@ -141,5 +154,130 @@ public class IngestionTests
 
         Assert.Equal(1d, result.RecallAtK);
         Assert.Equal(1d, result.Mrr);
+    }
+
+    [Fact]
+    public async Task Keyword_mode_matches_arabic_misspellings_without_embedding_the_query()
+    {
+        var (rag, _, emb, _) = Create();
+        await rag.IngestAsync(
+            "Policies",
+            "p.md",
+            "## الراتب\n\nيُصرف الراتب يوم 27.\n\n## الاستحقاق\n\nالموظف يستحق 21 يوم إجازة سنوية.",
+            default
+        );
+
+        var calls = emb.Calls;
+        var keyword = await rag.SearchAsync("اجازه", 1, default, RetrievalMode.Keyword);
+        Assert.Equal(calls, emb.Calls);
+
+        var vector = await rag.SearchAsync("اجازه", 1, default, RetrievalMode.Vector);
+        var hybrid = await rag.SearchAsync("اجازه", 1, default, RetrievalMode.Hybrid);
+        Assert.Equal("الراتب", vector[0].Section);
+        Assert.Equal("الاستحقاق", keyword[0].Section);
+        Assert.Equal("الاستحقاق", hybrid[0].Section);
+        Assert.Contains("إجازة", hybrid[0].Text);
+        Assert.DoesNotContain("اجازه", hybrid[0].Text);
+    }
+
+    [Fact]
+    public async Task Hybrid_rerank_uses_the_cross_encoder_and_falls_back_when_it_fails()
+    {
+        var repo = new FakeRepository();
+        var emb = new FakeEmbeddings();
+        var chat = new FakeChat();
+        var chunker = new StructureChunker();
+        var cache = new VectorCache();
+        var hybrid = new RagService(repo, emb, chat, chunker, cache);
+        var preferPayroll = new RagService(
+            repo,
+            emb,
+            chat,
+            chunker,
+            cache,
+            crossEncoder: new PreferSectionEncoder("Payroll")
+        );
+        var failing = new RagService(
+            repo,
+            emb,
+            chat,
+            chunker,
+            cache,
+            crossEncoder: new FailingEncoder()
+        );
+        await hybrid.IngestAsync(
+            "Leave",
+            "l.md",
+            "## Annual\n\nannual leave days\n\n## Payroll\n\nsalary paid monthly",
+            default
+        );
+
+        var fused = await hybrid.SearchAsync("annual leave", 1, default, RetrievalMode.Hybrid);
+        var reranked = await preferPayroll.SearchAsync("annual leave", 1, default, RetrievalMode.HybridRerank);
+        var fallback = await failing.SearchAsync("annual leave", 1, default, RetrievalMode.HybridRerank);
+
+        Assert.Equal("Payroll", reranked[0].Section);
+        Assert.Equal(fused[0].Section, fallback[0].Section);
+    }
+
+    [Fact]
+    public async Task Evaluation_runs_every_mode_and_skips_unanswerable_questions()
+    {
+        var (rag, _, _, _) = Create();
+        await rag.IngestAsync("Leave", "l.md", "## Payroll\n\nsalary paid monthly xyz", default);
+
+        var results = await rag.EvaluateAllModesAsync(
+            [
+                new EvaluationCase("salary paid monthly", "Leave", "Payroll", null),
+                new EvaluationCase("stock option vesting", "", null, null, true),
+            ],
+            4,
+            default
+        );
+
+        Assert.Equal(["Vector", "Keyword", "Hybrid", "HybridRerank"], results.Select(result => result.Mode).ToArray());
+        Assert.All(
+            results,
+            result =>
+            {
+                Assert.Equal(1d, result.RecallAtK);
+                Assert.Equal(1d, result.Mrr);
+                Assert.Equal(1, result.AnswerableQuestions);
+                Assert.Equal(1, result.UnanswerableQuestions);
+                Assert.True(result.Cases[0].LatencyMs >= 0);
+                Assert.True(result.Cases[1].Unanswerable);
+                Assert.Equal(0, result.Cases[1].Rank);
+                Assert.False(result.Cases[0].RerankerApplied);
+            }
+        );
+        Assert.False(results[^1].RerankerConfigured);
+    }
+
+    private sealed class PreferSectionEncoder(string section) : ICrossEncoder
+    {
+        public bool IsEnabled => true;
+
+        public Task<IReadOnlyList<RerankScore>> ScoreAsync(
+            string query,
+            IReadOnlyList<string> passages,
+            CancellationToken cancellationToken
+        )
+        {
+            IReadOnlyList<RerankScore> scores = passages
+                .Select((text, index) => new RerankScore(index, text.Contains(section, StringComparison.Ordinal) ? 1 : 0))
+                .ToList();
+            return Task.FromResult(scores);
+        }
+    }
+
+    private sealed class FailingEncoder : ICrossEncoder
+    {
+        public bool IsEnabled => true;
+
+        public Task<IReadOnlyList<RerankScore>> ScoreAsync(
+            string query,
+            IReadOnlyList<string> passages,
+            CancellationToken cancellationToken
+        ) => Task.FromException<IReadOnlyList<RerankScore>>(new HttpRequestException("down"));
     }
 }

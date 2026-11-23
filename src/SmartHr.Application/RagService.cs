@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -5,16 +6,24 @@ using SmartHr.Domain;
 
 namespace SmartHr.Application;
 
-/// <summary>Coordinates ingestion, semantic retrieval, grounded answers, and evaluation.</summary>
+/// <summary>Coordinates ingestion, hybrid retrieval, grounded answers, and evaluation.</summary>
 public sealed class RagService(
     IPolicyRepository repository,
     IEmbeddingService embeddings,
     IChatService chat,
     StructureChunker chunker,
-    VectorCache cache
+    VectorCache cache,
+    RetrievalOptions? retrieval = null,
+    ICrossEncoder? crossEncoder = null
 )
 {
-    private const int MaximumTopK = 20;
+    public const int MaximumTopK = 20;
+    public const int MaximumRerankPool = 32;
+
+    private readonly RetrievalOptions options = retrieval ?? new RetrievalOptions();
+    private readonly ICrossEncoder reranker = crossEncoder ?? DisabledCrossEncoder.Instance;
+
+    public static IReadOnlyList<RetrievalMode> AllModes { get; } = Enum.GetValues<RetrievalMode>();
 
     public static string ComputeHash(string text)
     {
@@ -105,43 +114,27 @@ public sealed class RagService(
     public async Task<IReadOnlyList<SearchHit>> SearchAsync(
         string question,
         int topK,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        RetrievalMode? mode = null
     )
     {
-        if (string.IsNullOrWhiteSpace(question))
-        {
-            throw new ArgumentException("A question is required.", nameof(question));
-        }
-
-        var questionVector = await embeddings.EmbedAsync(question.Trim(), cancellationToken);
-        var chunks = await cache.GetAsync(repository.GetChunksAsync, cancellationToken);
-
-        return chunks
-            .Where(c => c.Vector.Length == questionVector.Length)
-            .Select(c => (Chunk: c, Score: VectorMath.CosineSimilarity(questionVector, c.Vector)))
-            .OrderByDescending(x => x.Score)
-            .Take(Math.Clamp(topK, 1, MaximumTopK))
-            .Select(x => new SearchHit(
-                x.Chunk.ChunkId,
-                x.Chunk.DocumentId,
-                x.Chunk.DocumentName,
-                x.Chunk.Section,
-                x.Chunk.Text,
-                x.Score
-            ))
-            .ToList();
+        var outcome = await SearchCoreAsync(question, topK, cancellationToken, mode);
+        return outcome.Hits;
     }
 
     public async Task<AskResponse> AskAsync(
         string question,
         int topK,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        RetrievalMode? mode = null
     )
     {
-        var sources = await SearchAsync(question, topK, cancellationToken);
+        var sources = await SearchAsync(question, topK, cancellationToken, mode);
         if (sources.Count == 0)
         {
-            return new AskResponse(PromptBuilder.NoPoliciesMessage, sources);
+            var indexed = await cache.GetAsync(repository.GetChunksAsync, cancellationToken);
+            var message = indexed.Count == 0 ? PromptBuilder.NoPoliciesMessage : PromptBuilder.NoMatchMessage;
+            return new AskResponse(message, sources);
         }
 
         var answer = await chat.AnswerAsync(PromptBuilder.Build(question, sources), cancellationToken);
@@ -167,9 +160,35 @@ public sealed class RagService(
             || hit.Section.Contains(testCase.ExpectedSection, StringComparison.OrdinalIgnoreCase);
     }
 
-    public async Task<EvaluationResult> EvaluateAsync(
+    public Task<EvaluationResult> EvaluateAsync(
         IReadOnlyList<EvaluationCase> cases,
         int topK,
+        CancellationToken cancellationToken,
+        RetrievalMode? mode = null
+    ) => EvaluateModeAsync(cases, topK, ResolveMode(mode), cancellationToken);
+
+    public async Task<IReadOnlyList<EvaluationResult>> EvaluateAllModesAsync(
+        IReadOnlyList<EvaluationCase> cases,
+        int topK,
+        CancellationToken cancellationToken
+    )
+    {
+        var results = new List<EvaluationResult>(AllModes.Count);
+        foreach (var mode in AllModes)
+        {
+            results.Add(await EvaluateModeAsync(cases, topK, mode, cancellationToken));
+        }
+
+        return results;
+    }
+
+    public static string BuildEmbeddingText(string documentName, string section, string text) =>
+        $"Policy: {documentName}\nSection: {section}\n{text}";
+
+    private async Task<EvaluationResult> EvaluateModeAsync(
+        IReadOnlyList<EvaluationCase> cases,
+        int topK,
+        RetrievalMode mode,
         CancellationToken cancellationToken
     )
     {
@@ -179,45 +198,131 @@ public sealed class RagService(
         }
 
         var k = Math.Clamp(topK, 1, MaximumTopK);
+        var answerable = cases.Count(testCase => !testCase.Unanswerable);
         double found = 0, precision = 0, reciprocal = 0;
-        var details = new List<EvaluationCaseResult>();
+        var details = new List<EvaluationCaseResult>(cases.Count);
 
         foreach (var testCase in cases)
         {
-            var hits = await SearchAsync(testCase.Question, k, cancellationToken);
-            var relevant = hits.Count(h => Matches(h, testCase));
-            var rank = hits.ToList().FindIndex(h => Matches(h, testCase));
+            var started = Stopwatch.GetTimestamp();
+            var outcome = await SearchCoreAsync(testCase.Question, k, cancellationToken, mode);
+            var elapsedMs = (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+            var hits = outcome.Hits;
+            var rankIndex = testCase.Unanswerable ? -1 : hits.ToList().FindIndex(hit => Matches(hit, testCase));
+            var relevant = testCase.Unanswerable ? 0 : hits.Count(hit => Matches(hit, testCase));
             details.Add(
                 new EvaluationCaseResult(
                     testCase.Question,
                     testCase.ExpectedDocument,
                     testCase.ExpectedSection,
-                    rank < 0 ? 0 : rank + 1,
-                    hits.Select(h => $"{h.DocumentName} > {h.Section}").ToList()
+                    rankIndex < 0 ? 0 : rankIndex + 1,
+                    hits.Select(hit => $"{hit.DocumentName} > {hit.Section}").ToList(),
+                    elapsedMs,
+                    testCase.Unanswerable,
+                    outcome.RerankerApplied
                 )
             );
 
-            if (rank < 0)
+            if (testCase.Unanswerable || rankIndex < 0)
             {
                 continue;
             }
 
             found++;
             precision += (double)relevant / k;
-            reciprocal += 1d / (rank + 1);
+            reciprocal += 1d / (rankIndex + 1);
         }
 
+        var denominator = answerable == 0 ? 0 : answerable;
         return new EvaluationResult(
             cases.Count,
-            found / cases.Count,
-            precision / cases.Count,
-            reciprocal / cases.Count
+            denominator == 0 ? 0 : found / denominator,
+            denominator == 0 ? 0 : precision / denominator,
+            denominator == 0 ? 0 : reciprocal / denominator
         )
         {
             Cases = details,
+            Mode = mode.ToString(),
+            AnswerableQuestions = answerable,
+            UnanswerableQuestions = cases.Count - answerable,
+            MeanLatencyMs = details.Count == 0 ? 0 : details.Average(item => item.LatencyMs),
+            RerankerConfigured = mode == RetrievalMode.HybridRerank && reranker.IsEnabled,
         };
     }
 
-    public static string BuildEmbeddingText(string documentName, string section, string text) =>
-        $"Policy: {documentName}\nSection: {section}\n{text}";
+    private async Task<(IReadOnlyList<SearchHit> Hits, bool RerankerApplied)> SearchCoreAsync(
+        string question,
+        int topK,
+        CancellationToken cancellationToken,
+        RetrievalMode? mode
+    )
+    {
+        if (string.IsNullOrWhiteSpace(question))
+        {
+            throw new ArgumentException("A question is required.", nameof(question));
+        }
+
+        var resolved = ResolveMode(mode);
+        var k = Math.Clamp(topK, 1, MaximumTopK);
+        var trimmed = question.Trim();
+        var chunks = await cache.GetAsync(repository.GetChunksAsync, cancellationToken);
+
+        var vectorHits = new List<SearchHit>();
+        var keywordHits = new List<SearchHit>();
+        if (resolved != RetrievalMode.Keyword)
+        {
+            var questionVector = await embeddings.EmbedAsync(trimmed, cancellationToken);
+            vectorHits = RankByVector(chunks, questionVector);
+        }
+
+        if (resolved != RetrievalMode.Vector)
+        {
+            keywordHits = RankByKeyword(chunks, trimmed);
+        }
+
+        IReadOnlyList<SearchHit> ranked = resolved switch
+        {
+            RetrievalMode.Vector => vectorHits,
+            RetrievalMode.Keyword => keywordHits,
+            _ => Fuse(vectorHits, keywordHits),
+        };
+
+        var applied = false;
+        if (resolved == RetrievalMode.HybridRerank)
+        {
+            var pool = Math.Clamp(options.CandidatePool <= 0 ? 20 : options.CandidatePool, k, MaximumRerankPool);
+            var candidates = ranked.Take(pool).ToList();
+            var reranked = await Reranker.ApplyAsync(reranker, trimmed, candidates, cancellationToken);
+            ranked = reranked.Hits;
+            applied = reranked.Applied;
+        }
+
+        return (ranked.Take(k).ToList(), applied);
+    }
+
+    private RetrievalMode ResolveMode(RetrievalMode? mode) => mode ?? options.Mode;
+
+    private static List<SearchHit> RankByVector(IReadOnlyList<CachedChunk> chunks, float[] questionVector) =>
+        chunks
+            .Where(chunk => chunk.Vector.Length == questionVector.Length)
+            .Select(chunk => ToHit(chunk, VectorMath.CosineSimilarity(questionVector, chunk.Vector)))
+            .OrderByDescending(hit => hit.Score)
+            .ToList();
+
+    private List<SearchHit> RankByKeyword(IReadOnlyList<CachedChunk> chunks, string question) =>
+        Bm25.Rank(chunks, question, options.Bm25K1, options.Bm25B)
+            .Select(hit => ToHit(hit.Chunk, hit.Score))
+            .ToList();
+
+    private List<SearchHit> Fuse(IReadOnlyList<SearchHit> vectorHits, IReadOnlyList<SearchHit> keywordHits)
+    {
+        var k = options.RrfK <= 0 ? ReciprocalRankFusion.DefaultK : options.RrfK;
+        return ReciprocalRankFusion
+            .Fuse<SearchHit, Guid>([vectorHits, keywordHits], hit => hit.ChunkId, k)
+            .Select(hit => hit.Item with { Score = hit.Score })
+            .ToList();
+    }
+
+    private static SearchHit ToHit(CachedChunk chunk, double score) =>
+        new(chunk.ChunkId, chunk.DocumentId, chunk.DocumentName, chunk.Section, chunk.Text, score);
 }

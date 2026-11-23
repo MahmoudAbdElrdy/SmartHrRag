@@ -1,5 +1,5 @@
 {
-  "topK": 3,
+  "topK": 4,
   "cases": [
     {
       "question": "How many annual leave days for 3 years of experience?",
@@ -75,6 +75,76 @@
       "question": "كيف أبلغ عن مخالفة؟",
       "expectedDocument": "Code of Conduct | مدونة السلوك",
       "expectedSection": "الإبلاغ عن المخالفات"
+    },
+    {
+      "question": "لو عندي 3 سنين خبرة، كام يوم أجازة سنوية؟",
+      "expectedDocument": "Annual Leave Policy | سياسة الإجازة السنوية",
+      "expectedSection": "الاستحقاق"
+    },
+    {
+      "question": "الراتب بيتصرف امتى في الشهر؟",
+      "expectedDocument": "Payroll Policy | سياسة الرواتب",
+      "expectedSection": "موعد صرف الراتب"
+    },
+    {
+      "question": "ينفع أشتغل من البيت كام يوم في الأسبوع؟",
+      "expectedDocument": "Remote Work Policy | سياسة العمل عن بعد",
+      "expectedSection": "أيام العمل عن بعد"
+    },
+    {
+      "question": "كام يوم اجازه سنويه لموظف خبرته 3 سنوات؟",
+      "expectedDocument": "Annual Leave Policy | سياسة الإجازة السنوية",
+      "expectedSection": "الاستحقاق"
+    },
+    {
+      "question": "لو الاجازه المرضيه اكتر من يومين لازم شهاده طبيه؟",
+      "expectedDocument": "Sick Leave Policy | سياسة الإجازة المرضية",
+      "expectedSection": "الشهادة الطبية"
+    },
+    {
+      "question": "When is overtime paid at 150% of the hourly wage?",
+      "expectedDocument": "Overtime Policy | سياسة العمل الإضافي",
+      "expectedSection": "Overtime Rates"
+    },
+    {
+      "question": "How many sick days are paid at 75% of salary?",
+      "expectedDocument": "Sick Leave Policy | سياسة الإجازة المرضية",
+      "expectedSection": "Paid Sick Days"
+    },
+    {
+      "question": "How many days in advance must an annual leave request be submitted?",
+      "expectedDocument": "Annual Leave Policy | سياسة الإجازة السنوية",
+      "expectedSection": "Requesting Leave"
+    },
+    {
+      "question": "What happens to a supplier gift worth more than 100 SAR?",
+      "expectedDocument": "Code of Conduct | مدونة السلوك",
+      "expectedSection": "Conflicts of Interest"
+    },
+    {
+      "question": "Is the housing allowance 25% of basic salary?",
+      "expectedDocument": "Payroll Policy | سياسة الرواتب",
+      "expectedSection": "Allowances"
+    },
+    {
+      "question": "How many days of maternity leave does an employee get?",
+      "expectedDocument": "",
+      "unanswerable": true
+    },
+    {
+      "question": "كم يوم إجازة الحج؟",
+      "expectedDocument": "",
+      "unanswerable": true
+    },
+    {
+      "question": "هل الشركة بتغطي تأمين صحي للوالدين؟",
+      "expectedDocument": "",
+      "unanswerable": true
+    },
+    {
+      "question": "What is the stock option vesting schedule?",
+      "expectedDocument": "",
+      "unanswerable": true
     }
   ]
 }
