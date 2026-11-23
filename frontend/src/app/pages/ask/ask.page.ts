@@ -54,7 +54,7 @@ const COPY = {
     detailedGuide: 'شرح تفصيلي للمشروع',
     chunking: 'تقسيم السياسة عند العناوين والفقرات إلى مقاطع صغيرة مفهومة.',
     embedding: 'تحويل كل مقطع إلى متجه أرقام يلتقط معناه باستخدام nomic-embed-text.',
-    retrieval: 'تحويل السؤال لمتجه واختيار المقاطع الأقرب دلالياً باستخدام cosine similarity.',
+    retrieval: 'الوضع الافتراضي يرتب المقاطع بتشابه المتجهات. يمكن تفعيل بحث الكلمات أو الدمج مع إعادة الترتيب من إعدادات الـAPI.',
     answerStep: 'إرسال السؤال والمصادر إلى llama3.2:3b لصياغة إجابة مرتبطة بالدليل.',
     storageNote:
       'المقاطع والمتجهات تُحفظ في SQL Server. تغيير نموذج embeddings يتطلب إعادة فهرسة السياسات.',
@@ -109,7 +109,7 @@ const COPY = {
     detailedGuide: 'Read the project guide',
     chunking: 'Split policy text at headings and paragraphs into small, meaningful chunks.',
     embedding: 'Turn each chunk into a numeric vector with nomic-embed-text.',
-    retrieval: 'Embed the question and find the closest chunks with cosine similarity.',
+    retrieval: 'The default mode ranks chunks by cosine similarity. Keyword, hybrid, and reranking are selected in the API settings.',
     answerStep: 'Send the question and retrieved evidence to llama3.2:3b for a grounded answer.',
     storageNote:
       'Chunks and vectors are stored in SQL Server. Changing the embedding model requires reindexing policies.',

@@ -5,6 +5,9 @@ public static class PromptBuilder
     public const string NoPoliciesMessage =
         "لا توجد سياسات مفهرسة بعد. أضف سياسة ثم أعد المحاولة. / No policies are indexed yet. Add a policy and try again.";
 
+    public const string NoMatchMessage =
+        "لم أجد مقاطع مطابقة لهذا السؤال. / No matching policy passages were found for this question.";
+
     public static string Build(string question, IReadOnlyList<SearchHit> sources)
     {
         var context = string.Join(

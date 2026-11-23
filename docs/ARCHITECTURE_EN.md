@@ -37,9 +37,9 @@ Use the same embedding model for indexing and retrieval. If the model changes, r
 ## What happens when a question is asked?
 
 1. Angular sends the question and topK to POST /api/ask.
-2. bge-m3 converts the question to a vector.
-3. The application reads chunk vectors from SQL Server and computes cosine similarity against the question vector.
-4. It selects the top matching chunks. This step is called retrieval.
+2. Retrieval uses `Retrieval:Mode`: Vector, Keyword, Hybrid, or HybridRerank. Vector and the hybrid modes embed the question with bge-m3. Keyword search does not.
+3. Vector ranking loads chunk vectors from SQL Server and scores them with cosine similarity in memory. Keyword ranking scores the same chunks with BM25 after Arabic normalization. Hybrid fuses the two lists with reciprocal rank fusion. HybridRerank then reranks the top fused candidates when a reranker URL is configured.
+4. It keeps the highest ranked chunks. Displayed sources and the prompt use the original chunk text. Normalization is only for the keyword index.
 5. It packages those passages with policy names, sections, and chunk IDs.
 6. It sends the question and context to llama3.2:3b through /api/generate.
 7. The prompt asks the model to answer from the policy text and cite labels such as [Source 1]. Angular displays the answer and retrieved sources.
@@ -56,7 +56,7 @@ RAG combines semantic retrieval with a language model: retrieval finds policy te
 ## Learning-project limitations
 
 - There is no authentication, authorization, or tenant isolation.
-- All chunk vectors are loaded from SQL Server and compared in application memory, which will not scale to a large corpus.
+- Chunk vectors are loaded from SQL Server and compared in application memory. Keyword search is in-memory BM25 over that same snapshot, because SQL Server on Linux has no Full-Text Search. This will not scale to a large corpus.
 - Storing vectors as JSON in SQL Server is a teaching choice; use a vector-capable search engine for larger collections.
 - Chunking is not token-aware and has no overlap.
 - Docker Compose credentials are for local development only.

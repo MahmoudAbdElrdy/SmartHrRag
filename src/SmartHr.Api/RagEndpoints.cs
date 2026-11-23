@@ -16,7 +16,7 @@ public static class RagEndpoints
         group.MapPost(
             "/search",
             async (SearchRequest request, RagService rag, CancellationToken ct) =>
-                Results.Ok(await rag.SearchAsync(request.Question, request.TopK, ct))
+                Results.Ok(await rag.SearchAsync(request.Question, request.TopK, ct, request.Mode))
         );
 
         group.MapPost(
@@ -29,7 +29,7 @@ public static class RagEndpoints
             ) =>
             {
                 var watch = Stopwatch.StartNew();
-                var answer = await rag.AskAsync(request.Question, request.TopK, ct);
+                var answer = await rag.AskAsync(request.Question, request.TopK, ct, request.Mode);
                 var log = new QuestionLog
                 {
                     UserId = null, // anonymous (no login)
@@ -103,39 +103,44 @@ public static class RagEndpoints
             "/",
             async (EvaluationRequest? request, RagService rag, RagDbContext db, CancellationToken ct) =>
             {
-                var topK = request?.TopK is > 0 ? request.TopK : 3;
-                List<EvaluationCase> cases = request?.Cases is { Count: > 0 }
-                    ? request
-                        .Cases.Select(c => new EvaluationCase(c.Question, c.ExpectedDocument, c.ExpectedSection, c.ExpectedChunkId))
-                        .ToList()
-                    : await db.RetrievalCases.AsNoTracking()
-                        .Select(c => new EvaluationCase(c.Question, c.ExpectedDocument, c.ExpectedSection, c.ExpectedChunkId))
-                        .ToListAsync(ct);
-
-                var result = await rag.EvaluateAsync(cases, topK, ct);
-                var run = new EvaluationRun
-                {
-                    TopK = topK,
-                    Questions = result.Questions,
-                    RecallAtK = result.RecallAtK,
-                    PrecisionAtK = result.PrecisionAtK,
-                    Mrr = result.Mrr,
-                    DetailsJson = JsonSerializer.Serialize(result.Cases),
-                };
+                var topK = request?.TopK is > 0 ? request.TopK : 4;
+                var cases = await LoadCasesAsync(request, db, ct);
+                var result = await rag.EvaluateAsync(cases, topK, ct, request?.Mode);
+                var run = ToRun(topK, result);
                 db.EvaluationRuns.Add(run);
                 await db.SaveChangesAsync(ct);
-                return Results.Ok(
-                    new
-                    {
-                        runId = run.Id,
-                        topK,
-                        questions = result.Questions,
-                        recallAtK = result.RecallAtK,
-                        precisionAtK = result.PrecisionAtK,
-                        mrr = result.Mrr,
-                        cases = result.Cases,
-                    }
-                );
+                return Results.Ok(new
+                {
+                    runId = run.Id,
+                    topK,
+                    mode = result.Mode,
+                    questions = result.Questions,
+                    answerableQuestions = result.AnswerableQuestions,
+                    unanswerableQuestions = result.UnanswerableQuestions,
+                    recallAtK = result.RecallAtK,
+                    precisionAtK = result.PrecisionAtK,
+                    mrr = result.Mrr,
+                    meanLatencyMs = result.MeanLatencyMs,
+                    rerankerConfigured = result.RerankerConfigured,
+                    cases = result.Cases,
+                });
+            }
+        );
+
+        evaluation.MapPost(
+            "/compare",
+            async (EvaluationRequest? request, RagService rag, RagDbContext db, CancellationToken ct) =>
+            {
+                var topK = request?.TopK is > 0 ? request.TopK : 4;
+                var cases = await LoadCasesAsync(request, db, ct);
+                var results = await rag.EvaluateAllModesAsync(cases, topK, ct);
+                foreach (var result in results)
+                {
+                    db.EvaluationRuns.Add(ToRun(topK, result));
+                }
+
+                await db.SaveChangesAsync(ct);
+                return Results.Ok(new { topK, modes = results });
             }
         );
 
@@ -153,7 +158,7 @@ public static class RagEndpoints
                     await db.EvaluationRuns.AsNoTracking()
                         .OrderByDescending(r => r.CreatedUtc)
                         .Take(20)
-                        .Select(r => new { r.Id, r.CreatedUtc, r.TopK, r.Questions, r.RecallAtK, r.PrecisionAtK, r.Mrr })
+                        .Select(r => new { r.Id, r.CreatedUtc, r.TopK, r.Mode, r.Questions, r.RecallAtK, r.PrecisionAtK, r.Mrr })
                         .ToListAsync(ct)
                 )
         );
@@ -166,4 +171,46 @@ public static class RagEndpoints
 
         return endpoints;
     }
+
+    private static async Task<List<EvaluationCase>> LoadCasesAsync(
+        EvaluationRequest? request,
+        RagDbContext db,
+        CancellationToken cancellationToken
+    )
+    {
+        if (request?.Cases is { Count: > 0 })
+        {
+            return request
+                .Cases.Select(c => new EvaluationCase(
+                    c.Question,
+                    c.ExpectedDocument,
+                    c.ExpectedSection,
+                    c.ExpectedChunkId,
+                    c.Unanswerable
+                ))
+                .ToList();
+        }
+
+        return await db.RetrievalCases.AsNoTracking()
+            .Select(c => new EvaluationCase(
+                c.Question,
+                c.ExpectedDocument,
+                c.ExpectedSection,
+                c.ExpectedChunkId,
+                c.Unanswerable
+            ))
+            .ToListAsync(cancellationToken);
+    }
+
+    private static EvaluationRun ToRun(int topK, EvaluationResult result) =>
+        new()
+        {
+            TopK = topK,
+            Questions = result.Questions,
+            RecallAtK = result.RecallAtK,
+            PrecisionAtK = result.PrecisionAtK,
+            Mrr = result.Mrr,
+            Mode = result.Mode,
+            DetailsJson = JsonSerializer.Serialize(result.Cases),
+        };
 }

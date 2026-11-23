@@ -63,7 +63,8 @@ public sealed record EvaluationCase(
     string Question,
     string? ExpectedDocument,
     string? ExpectedSection,
-    Guid? ExpectedChunkId
+    Guid? ExpectedChunkId,
+    bool Unanswerable = false
 );
 
 public sealed record EvaluationCaseResult(
@@ -71,7 +72,10 @@ public sealed record EvaluationCaseResult(
     string? ExpectedDocument,
     string? ExpectedSection,
     int Rank,
-    IReadOnlyList<string> Retrieved
+    IReadOnlyList<string> Retrieved,
+    long LatencyMs = 0,
+    bool Unanswerable = false,
+    bool RerankerApplied = false
 );
 
 public sealed record EvaluationResult(
@@ -82,4 +86,11 @@ public sealed record EvaluationResult(
 )
 {
     public IReadOnlyList<EvaluationCaseResult> Cases { get; init; } = [];
+    public string Mode { get; init; } = nameof(RetrievalMode.Vector);
+    public int AnswerableQuestions { get; init; }
+    public int UnanswerableQuestions { get; init; }
+    public double MeanLatencyMs { get; init; }
+
+    /// <summary>True when this mode is HybridRerank and a reranker URL is configured.</summary>
+    public bool RerankerConfigured { get; init; }
 }

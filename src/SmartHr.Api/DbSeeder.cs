@@ -84,26 +84,44 @@ public static class DbSeeder
     private static async Task SeedEvaluationCasesAsync(RagDbContext db, string samples, ILogger logger)
     {
         var path = Path.Combine(samples, "evaluation.json");
-        if (!File.Exists(path) || await db.RetrievalCases.AnyAsync())
+        if (!File.Exists(path))
         {
             return;
         }
 
         using var json = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+        var known = (await db.RetrievalCases.Select(c => c.Question).ToListAsync())
+            .ToHashSet(StringComparer.Ordinal);
+        var added = 0;
         foreach (var item in json.RootElement.GetProperty("cases").EnumerateArray())
         {
+            var question = item.GetProperty("question").GetString() ?? "";
+            if (question.Length == 0 || !known.Add(question))
+            {
+                continue;
+            }
+
             db.RetrievalCases.Add(
                 new RetrievalCase
                 {
-                    Question = item.GetProperty("question").GetString() ?? "",
+                    Question = question,
                     ExpectedDocument = item.TryGetProperty("expectedDocument", out var d) ? d.GetString() ?? "" : "",
-                    ExpectedSection = item.TryGetProperty("expectedSection", out var s) ? s.GetString() : null,
+                    ExpectedSection = item.TryGetProperty("expectedSection", out var s) && s.ValueKind != JsonValueKind.Null
+                        ? s.GetString()
+                        : null,
+                    Unanswerable = item.TryGetProperty("unanswerable", out var u) && u.ValueKind == JsonValueKind.True,
                 }
             );
+            added++;
+        }
+
+        if (added == 0)
+        {
+            return;
         }
 
         await db.SaveChangesAsync();
-        logger.LogInformation("Seeded evaluation cases.");
+        logger.LogInformation("Seeded {Count} evaluation cases.", added);
     }
 
     private static string? FindSamplesDirectory(string contentRoot, string? configured)

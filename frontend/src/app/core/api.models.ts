@@ -58,20 +58,34 @@ export interface EvaluationCaseResult {
   expectedSection: string | null;
   rank: number;
   retrieved: string[];
+  latencyMs?: number;
+  unanswerable?: boolean;
+  rerankerApplied?: boolean;
 }
 
 export interface EvaluationResult {
+  mode?: string;
   questions: number;
+  answerableQuestions?: number;
+  unanswerableQuestions?: number;
   recallAtK: number;
   precisionAtK: number;
   mrr: number;
+  meanLatencyMs?: number;
+  rerankerConfigured?: boolean;
   cases: EvaluationCaseResult[];
+}
+
+export interface EvaluationComparison {
+  topK: number;
+  modes: EvaluationResult[];
 }
 
 export interface EvaluationRunSummary {
   id: string;
   createdUtc: string;
   topK: number;
+  mode?: string | null;
   questions: number;
   recallAtK: number;
   precisionAtK: number;
